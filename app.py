@@ -266,6 +266,48 @@ async def startup_event():
         logger.error(f"❌ Model loading failed: {e}")
         raise e
 
+@app.get("/predict", include_in_schema=False)
+async def predict_info():
+    """GET endpoint for /predict - provides usage information"""
+    if artifacts is None:
+        return {
+            "error": "Model not loaded",
+            "message": "Please check /health endpoint for model status"
+        }
+    
+    # Get sample values for demonstration
+    le_service = artifacts['label_encoders']['service']
+    le_location = artifacts['label_encoders']['location'] 
+    le_time = artifacts['label_encoders']['time']
+    
+    return {
+        "message": "Use POST method with JSON body to get predictions",
+        "method": "POST",
+        "endpoint": "/predict",
+        "content_type": "application/json",
+        "request_format": {
+            "service_type": "string (required)",
+            "location": "string (required)", 
+            "time_slot": "string (required)",
+            "top_k": "integer (optional, default: 3)"
+        },
+        "example_request": {
+            "service_type": le_service.classes_[0] if len(le_service.classes_) > 0 else "plumbing",
+            "location": le_location.classes_[0] if len(le_location.classes_) > 0 else "Downtown",
+            "time_slot": le_time.classes_[0] if len(le_time.classes_) > 0 else "Morning",
+            "top_k": 3
+        },
+        "curl_example": f"""curl -X POST "http://localhost:8000/predict" \\
+     -H "Content-Type: application/json" \\
+     -d '{{"service_type": "{le_service.classes_[0] if len(le_service.classes_) > 0 else 'plumbing'}", "location": "{le_location.classes_[0] if len(le_location.classes_) > 0 else 'Downtown'}", "time_slot": "{le_time.classes_[0] if len(le_time.classes_) > 0 else 'Morning'}", "top_k": 3}}'""",
+        "helpful_endpoints": {
+            "service_types": "/service-types - Get all accepted service type variations",
+            "model_info": "/model-info - Get available options for all fields",
+            "test": "/test-predict - Quick test with sample data",
+            "docs": "/docs - Interactive API documentation"
+        }
+    }
+
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_technician(request: PredictionRequest):
     """Make technician predictions with flexible service type mapping"""
@@ -448,7 +490,7 @@ async def root():
             "predict": "/predict",
             "health": "/health",
             "model_info": "/model-info",
-            "service_types": "/service-types",  # NEW ENDPOINT ADDED HERE
+            "service_types": "/service-types",
             "docs": "/docs"
         }
     }
